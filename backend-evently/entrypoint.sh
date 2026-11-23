@@ -17,8 +17,10 @@ if [ "$MODE" = "http" ]; then
   echo ">> Running DB migrations"
   node dist/core/cli/run-migrations.js
   echo ">> Migrations OK"
-  node dist/core/cli/run-seeders.js
-  echo ">> Seeders OK"
+  if [ "${NODE_ENV}" = "development" ]; then
+    node dist/core/cli/run-seeders.js
+    echo ">> Seeders OK"
+  fi
   echo ">> Http OK"
   exec node dist/main.js
 else

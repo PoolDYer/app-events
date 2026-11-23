@@ -33,6 +33,8 @@ const submit = async () => {
                 v-model="form.password"
                 type="password"
                 required
+                minlength="8"
+                maxlength="128"
                 placeholder="Contraseña"
                 class="w-full rounded-xl border p-3"
             />
