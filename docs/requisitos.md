@@ -14,4 +14,4 @@ El actor de la app Android es el asistente. Puede crear una cuenta o usar una ex
 | EB-08 | Confirmar el cierre de sesión. | Se vuelve al login y se limpian los tokens y la caché de Evently en el dispositivo. |
 | EB-09 | Ejecutar las pruebas JVM. | Las pruebas con fakes cubren el caso de listado, el caso de inscripción y el ViewModel del catálogo. |
 
-La inscripción requiere red, sesión y cupo disponible. Una operación repetida por el mismo asistente devuelve la inscripción que ya existe. El servidor decide la disponibilidad final si otro asistente toma el último lugar entre la lectura y el envío.
+La inscripción requiere conexión y una sesión activa. El cliente habilita el botón cuando el evento está activo y tiene cupos. La API original carece de información de cupos y devuelve HTTP 400 si se repite una inscripción. [Contrato REST](README.md#32-contrato-rest)

@@ -36,12 +36,10 @@ La versión de depuración usa `http://10.0.2.2:3001/api/` en el emulador. Para 
 | EB-09, Q-01 | Pruebas unitarias con fakes para listado, inscripción y el ViewModel del catálogo. |
 | Q-02 a Q-04 | Documentación y capturas en este repositorio, commits descriptivos y APK de depuración instalable. |
 
-## Arquitectura y verificación
+## Documentación del proyecto
 
+- [Guía técnica de Evently Mobile](docs/README.md)
 - [Requisitos funcionales y reglas de inscripción](docs/requisitos.md)
-- [Arquitectura y comunicación entre capas](docs/arquitectura.md)
-- [Integración REST, persistencia y sesión](docs/integraciones.md)
-- [Flujo de demostración y evidencias](docs/verificacion.md)
 
 <img src="docs/capturas/04-confirmacion.png" width="220" alt="Detalle de Evently con cupos disponibles e inscripción confirmada">
 
