@@ -41,4 +41,6 @@ La versión de depuración usa `http://10.0.2.2:3001/api/` en el emulador. Para 
 - [Integración REST, persistencia y sesión](docs/integraciones.md)
 - [Flujo de demostración y evidencias](docs/verificacion.md)
 
+<img src="docs/capturas/04-confirmacion.png" width="220" alt="Detalle de Evently con cupos disponibles e inscripción confirmada">
+
 El cliente usa Kotlin, Jetpack Compose Material 3, Navigation Compose, Hilt, ViewModel, Coroutines, Flow, Room, Retrofit, Moshi, OkHttp y JUnit.

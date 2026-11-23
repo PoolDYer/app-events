@@ -118,7 +118,7 @@ private fun EventlyNavigation(signedIn: Boolean, session: SessionViewModel) {
         AlertDialog(
             onDismissRequest = { confirmLogout = false },
             title = { Text("¿Cerrar sesión?") },
-            text = { Text("Se borrarán los eventos y las suscripciones guardados en este dispositivo.") },
+            text = { Text("Se borrarán los eventos, las suscripciones y los datos guardados por versiones anteriores de Evently en este dispositivo.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLogout = false

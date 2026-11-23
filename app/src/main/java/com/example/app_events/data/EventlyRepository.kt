@@ -1,5 +1,6 @@
 package com.example.app_events.data
 
+import android.content.Context
 import androidx.room.withTransaction
 import com.example.app_events.data.local.EncryptedSession
 import com.example.app_events.data.local.EventlyDatabase
@@ -16,6 +17,7 @@ import com.example.app_events.domain.EventsRepository
 import com.example.app_events.domain.FailureReason
 import com.example.app_events.domain.SessionRepository
 import com.squareup.moshi.JsonDataException
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.io.InterruptedIOException
 import javax.inject.Inject
@@ -31,6 +33,7 @@ import retrofit2.HttpException
 
 @Singleton
 class EventlyRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: EventlyDatabase,
     private val store: EncryptedSession,
     private val sessionApi: SessionApi,
@@ -65,9 +68,9 @@ class EventlyRepository @Inject constructor(
     override suspend fun logout() {
         val token = withContext(Dispatchers.IO + NonCancellable) {
             sessionLock.withLock {
-                val previous = store.clear()
+                clearPreviousDemoData()
                 database.clearAllTables()
-                previous?.refresh
+                store.clear()?.refresh
             }
         }
         if (token != null) {
@@ -76,6 +79,19 @@ class EventlyRepository @Inject constructor(
             } catch (_: IOException) {
                 // The device session has already been closed.
             }
+        }
+    }
+
+    private fun clearPreviousDemoData() {
+        val databaseName = "app_events_database"
+        val previousDatabase = context.getDatabasePath(databaseName)
+        if (previousDatabase.exists()) {
+            check(context.deleteDatabase(databaseName))
+        }
+
+        val previousPreferences = context.filesDir.resolve("datastore/user_settings.preferences_pb")
+        if (previousPreferences.exists()) {
+            check(previousPreferences.delete())
         }
     }
 
@@ -144,8 +160,8 @@ class EventlyRepository @Inject constructor(
                     withContext(Dispatchers.IO + NonCancellable) {
                         sessionLock.withLock {
                             if (store.tokens.value?.id == session) {
-                                store.clear()
                                 database.clearAllTables()
+                                store.clear()
                             }
                         }
                     }
