@@ -2,7 +2,7 @@
 
 ## Inicio local en Windows
 
-Con Docker Desktop iniciado, ejecuta `./start-local.ps1` desde PowerShell. El script prepara el archivo `.env` con claves locales, crea la red compartida y espera a que los servicios estén listos. La aplicación web queda en [localhost:3000](http://localhost:3000) y la API en [localhost:3001/api/docs](http://localhost:3001/api/docs).
+Con Docker Desktop iniciado, ejecuta `./start-local.ps1` desde PowerShell. El script crea `.env` con claves locales si hace falta, prepara la red y espera a que los servicios estén listos. Android accede a la API REST directamente en el puerto 3001. El contenedor web sirve sus archivos estáticos en el puerto 3000. [Swagger local](http://localhost:3001/api/docs) · [Sitio web local](http://localhost:3000)
 
 Si otro servicio usa el puerto de Redis del equipo, ajusta `REDIS_PORT` en `.env`. Redis mantiene el puerto 6379 dentro de la red Docker.
 
@@ -71,56 +71,7 @@ infra
 
 ## Variables de entorno
 
-Ejemplo **.env** (recortado a lo esencial para infra). Adecúa nombres/credenciales a tu entorno:
-
-```env
-PROJECT_NAME="app-evently"
-NETWORK="network-app-evently"
-TZ="America/Lima"
-BACKEND_IMAGE="http-app-evently"
-BACKEND_TAG="0.0.1"
-WEB_IMAGE="web-app-evently"
-WEB_TAG="0.0.1"
-
-# Mysql
-MYSQL_CONTAINER_NAME="mysql-app-evently"
-MYSQL_ROOT_PASSWORD="root"
-MYSQL_DATABASE="db_app_evently"
-MYSQL_VOLUME="evently_mysql_volume"
-
-# Redis
-REDIS_CONTAINER_NAME="redis-app-evently"
-REDIS_PORT="6379"
-REDIS_VOLUME="evently_redis_volume"
-REDIS_DB="0"
-REDIS_PASSWORD=""
-
-# Http
-HTTP_CONTAINER_NAME="http-app-evently"
-HTTP_DOCKER_PLATFORM="linux/amd64"
-HTTP_NODE_ENV="development"
-HTTP_NODE_DEBUG="false"
-HTTP_APP_PORT="3001"
-HTTP_DB_POOL="5"
-HTTP_GLOBAL_PREFIX="/api"
-HTTP_DB_LOGGING="true"
-HTTP_DB_SYNCHRONIZE="false"
-HTTP_JWT_ACCESS_SECRET="!Evently@access"
-HTTP_JWT_ACCESS_TTL="12h"
-HTTP_JWT_REFRESH_SECRET="!Evently@refresh"
-HTTP_JWT_REFRESH_TTL="7d"
-HTTP_SWAGGER_TITLE="Evently API"
-HTTP_SWAGGER_DESC="Backend para gestión de eventos (Evently)"
-HTTP_SWAGGER_VERSION="1.0.0"
-
-# Web
-WEB_CONTAINER_NAME="web-app-evently"
-WEB_DOCKER_PLATFORM="linux/amd64"
-WEB_VITE_API_BASE_URL="http://http-app-evently:3001/api"
-WEB_VITE_WS_HOST="http://http-app-evently:3001"
-WEB_APP_PORT="3000"
-
-```
+El script de Windows genera `.env` desde la plantilla y asigna claves locales para MySQL y JWT. Para un arranque manual, copia la plantilla a `.env` y completa esas claves antes de iniciar los servicios. [Plantilla de configuración](.env.example)
 
 ---
 
@@ -170,10 +121,13 @@ docker-compose -f docker-compose.web.yml -p app-evently logs -f web
 
 ## Puertos por servicio (host → container)
 
-| Servicio          | Host | Container |
-| ----------------- | ---- | --------: |
-| Frontend HTTP     | 3000 |      3000 |
-| Backend HTTP      | 3001 |      3001 |
-| Backend WebSocket | 3001 |      3001 |
-| DB Mysql          | 3306 |      3306 |
-| Cache Redis       | 6379 |      6379 |
+Los puertos se publican en `127.0.0.1`. La tabla usa la configuración predeterminada.
+
+| Servicio | Puerto del equipo | Puerto del contenedor |
+| --- | ---: | ---: |
+| Web estática (Nginx) | 3000 | 80 |
+| API REST | 3001 | 3001 |
+| MySQL | 3306 | 3306 |
+| Redis | 6379 | 6379 |
+
+Si configuras `REDIS_PORT=6382`, Redis queda en `6382 → 6379`.

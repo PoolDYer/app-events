@@ -1,6 +1,6 @@
 # Evently Mobile · Nivel Básico
 
-Evently es una app Android para asistentes a eventos. Permite registrarse con correo y contraseña, consultar próximos eventos, ver su detalle e inscribirse. Room conserva los eventos y las inscripciones que ya se descargaron para consultarlos sin conexión.
+Evently Mobile es un cliente Android para asistentes a eventos. Incluye registro, inicio y cierre de sesión, pantallas de eventos e inscripciones, y caché local en Room.
 
 La aplicación Android se comunica por REST con el backend Evently del curso. El alcance funcional corresponde a EB-01 a EB-09. [Requisitos de Evently Básico](requisitos.md) · [Alcance oficial del curso](curso/alcance_proyectos_android.md#44-nivel-básico)
 
@@ -91,7 +91,7 @@ La URL base termina en `/api/`. La API usa MySQL para los usuarios, eventos e in
 | POST | `/events/{id}/subscribe` | Requiere access token. La API original crea la suscripción y devuelve HTTP 400 si se repite. |
 | GET | `/me/subscriptions` | Requiere access token. Devuelve las inscripciones del usuario autenticado. |
 
-`EventDto` exige un entero `availableSpots` tanto en el catálogo y el detalle como en el evento anidado de una suscripción. El backend incluido devuelve eventos sin ese dato. Aunque una respuesta HTTP sea exitosa, Moshi rechaza un evento al que le falte el campo. Si el servidor confirma una inscripción y la respuesta contiene un evento incompatible, la fila del servidor puede existir aunque Android muestre un error y no pueda guardar la respuesta en Room.
+`EventDto` exige un entero `availableSpots` en el catálogo, el detalle y el evento anidado de una suscripción. La comprobación de la API local devolvió HTTP 200 para catálogo y detalle, con eventos que omiten ese campo. Moshi rechaza la respuesta al convertir cada evento a `EventDto`.
 
 [Servicio de eventos](../backend-evently/src/features/events/events.service.ts) · [Servicio de inscripciones](../backend-evently/src/features/subscriptions/subscriptions.service.ts)
 
@@ -124,7 +124,7 @@ Room es la fuente de los datos que se muestran en pantalla. El repositorio actua
 
 ## 5. Funcionalidades y comunicación entre capas
 
-| Funcionalidad | Implementación | Requisito |
+| Funcionalidad | Comportamiento del cliente Android | Requisito |
 | --- | --- | --- |
 | Arranque | `SessionViewModel` restaura la sesión. `EventlyApp` abre el catálogo con sesión o el login sin sesión. | EB-02 |
 | Inicio de sesión y registro | `AuthViewModel` valida correo y contraseña de al menos ocho caracteres. El registro solicita también el nombre. | EB-01 |
@@ -155,47 +155,16 @@ sequenceDiagram
     VM->>UC: Solicita una actualización
     UC->>R: Actualiza el catálogo
     R->>API: GET /api/events
-    alt Respuesta compatible
-        API-->>R: Eventos con availableSpots
-        R->>DB: Actualiza el catálogo en una transacción
-        DB-->>R: Emite los nuevos datos
-        R-->>VM: Emite la lista actualizada
-        VM-->>UI: Actualiza la pantalla
-    else Error de red o de lectura
-        R-->>VM: Devuelve el fallo
-        VM-->>UI: Muestra el aviso y Reintentar
-    end
+    API-->>R: HTTP 200 con eventos sin availableSpots
+    R-->>VM: Error de lectura, conserva la caché
+    VM-->>UI: Muestra el aviso y Reintentar
 ```
 
-Desde cualquiera de las dos listas, la ruta `events/{id}` lleva al detalle. El repositorio consulta el evento por ID y sincroniza por separado las inscripciones de la cuenta.
+La ruta `events/{id}` abre el detalle de un evento listado. El repositorio consulta su ID y solicita las inscripciones de la cuenta. El detalle devuelto por la API incluida presenta la misma incompatibilidad que el catálogo.
 
-### 5.2 Confirmación de una inscripción
+### 5.2 Inscripción en el cliente
 
-```mermaid
-sequenceDiagram
-    participant UI as Detalle
-    participant VM as EventDetailViewModel
-    participant UC as SubscribeToEvent
-    participant R as EventlyRepository
-    participant API as Evently REST
-    participant DB as Room
-
-    UI->>VM: Pulsa Suscribirme
-    VM-->>UI: Muestra el indicador de envío
-    VM->>UC: Ejecuta con el ID del evento
-    UC->>R: Solicita la inscripción
-    R->>API: POST /api/events/{id}/subscribe
-    alt Confirmación con respuesta compatible
-        API-->>R: Inscripción con el evento actualizado
-        R->>DB: Guarda el evento y su inscripción
-        DB-->>R: Emite el cambio
-        R-->>VM: Emite el estado de inscripción
-        VM-->>UI: Muestra Suscrito y la confirmación
-    else Error de petición o de lectura
-        R-->>VM: Devuelve el fallo
-        VM-->>UI: Muestra el mensaje y Reintentar
-    end
-```
+El botón ejecuta `SubscribeToEvent` y el repositorio realiza `POST /api/events/{id}/subscribe`. Para guardar una inscripción, el cliente debe poder leer el evento que devuelve la API. Con el backend incluido el flujo se bloquea desde la descarga inicial de un catálogo con eventos.
 
 ## 6. Ejecutar, probar y mantener
 
@@ -209,7 +178,7 @@ sequenceDiagram
 
 2. Abre la raíz del repositorio en Android Studio. Usa JDK 21 para Gradle e instala Android SDK Platform 37. Selecciona un emulador o dispositivo con API 29 o superior.
 3. Ejecuta el módulo `app`. En un emulador Android, el APK de depuración usa `http://10.0.2.2:3001/api/`. Para un dispositivo físico por USB, usa `adb reverse tcp:3001 tcp:3001` y compila con `-PeventlyApiUrl=http://127.0.0.1:3001/api/`. Para una API remota, proporciona su URL HTTPS con la misma propiedad.
-4. Registra una cuenta o usa la cuenta `attendee` de los datos de desarrollo del curso. Con el backend original puedes verificar el arranque y el acceso. Para comprobar catálogo, detalle, inscripción y sincronización en Android se requiere una API que entregue el campo descrito en el contrato REST.
+4. Registra una cuenta o usa la cuenta `attendee` de los datos de desarrollo del curso. Luego del acceso, puedes comprobar el aviso de error al cargar el catálogo con la API incluida.
 
 [Infraestructura](../infra-evently/README.md) · [Swagger local](http://localhost:3001/api/docs) · [Datos de desarrollo](../backend-evently/src/core/database/seed/data/users.json)
 
@@ -229,19 +198,13 @@ sequenceDiagram
 
 Las pruebas de `EventlyBasicTest` usan un repositorio falso. Cubren EB-09 y no ejercitan la deserialización contra la API del curso. [Pruebas JVM](../app/src/test/java/com/example/app_events/EventlyBasicTest.kt)
 
-### Demostración y evidencias
+### Comprobaciones con la API incluida
 
-Con una API compatible, inicia sesión, abre un evento, inscríbete y comprueba que aparece en Mis suscripciones. Desconecta el emulador y vuelve a abrir la app para verificar que aún muestra los datos descargados y el aviso de red. Confirma el cierre de sesión y comprueba que vuelve al formulario de acceso y vacía la caché local.
+- Inicia sesión y verifica que la app abra Próximos eventos. Con eventos de ejemplo en el servidor, la descarga muestra un error de lectura por la incompatibilidad del contrato.
+- Confirma el cierre de sesión en Android. La app borra las credenciales y la caché local y vuelve al formulario de acceso.
+- Consulta `GET /api/events` y `GET /api/events/{id}` en el puerto 3001. Ambas rutas responden HTTP 200 para los eventos de ejemplo y su JSON omite `availableSpots`.
 
-Las capturas corresponden a la demostración anterior a la reversión del backend. En esa versión se verificaron también la rotación del dispositivo, la renovación de la sesión y la limpieza de Room y de los datos del prototipo. La API restaurada no reproduce los resultados de catálogo e inscripción de esas capturas.
-
-| Inicio de sesión | Catálogo | Detalle |
-| --- | --- | --- |
-| ![Inicio de sesión](capturas/01-login.png) | ![Próximos eventos](capturas/02-catalogo.png) | ![Detalle y cupos](capturas/03-detalle.png) |
-
-| Inscripción confirmada | Mis suscripciones | Catálogo sin conexión |
-| --- | --- | --- |
-| ![Inscripción confirmada](capturas/04-confirmacion.png) | ![Suscripciones de la cuenta](capturas/05-suscripciones.png) | ![Catálogo guardado en Room](capturas/06-sin-conexion.png) |
+<img src="capturas/01-login.png" width="220" alt="Pantalla de inicio de sesión de Evently">
 
 ### Diagnóstico
 
