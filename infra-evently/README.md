@@ -1,5 +1,11 @@
 # App evently — Infra
 
+## Inicio local en Windows
+
+Con Docker Desktop iniciado, ejecuta `./start-local.ps1` desde PowerShell. El script prepara el archivo `.env` con claves locales, crea la red compartida y espera a que los servicios estén listos. La aplicación web queda en [localhost:3000](http://localhost:3000) y la API en [localhost:3001/api/docs](http://localhost:3001/api/docs).
+
+Si otro servicio usa el puerto de Redis del equipo, ajusta `REDIS_PORT` en `.env`. Redis mantiene el puerto 6379 dentro de la red Docker.
+
 ## Este directorio contiene los contenedores configurados necesarios para poder aproveer y deployar las aplicaciones de evently
 
 ## Paso 0) Instalación de Docker y Docker Compose
@@ -95,7 +101,7 @@ HTTP_DOCKER_PLATFORM="linux/amd64"
 HTTP_NODE_ENV="development"
 HTTP_NODE_DEBUG="false"
 HTTP_APP_PORT="3001"
-HHPT_DB_POOL="5"
+HTTP_DB_POOL="5"
 HTTP_GLOBAL_PREFIX="/api"
 HTTP_DB_LOGGING="true"
 HTTP_DB_SYNCHRONIZE="false"
@@ -110,8 +116,6 @@ HTTP_SWAGGER_VERSION="1.0.0"
 # Web
 WEB_CONTAINER_NAME="web-app-evently"
 WEB_DOCKER_PLATFORM="linux/amd64"
-WEB_VITE_API_BASE_URL="http://http-app-evently:3001/api"
-WEB_VITE_WS_HOST="http://http-app-evently:3001"
 WEB_APP_PORT="3000"
 
 ```

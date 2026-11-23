@@ -6,11 +6,13 @@ import { SubscriptionsController } from "./subscriptions.controller";
 import { EventsModule } from "../events/events.module";
 import { UsersModule } from "../users/users.module";
 import { MeController } from "./me.controller";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([EventSubscription]),
         forwardRef(() => EventsModule),
+        forwardRef(() => NotificationsModule),
         UsersModule,
     ],
     providers: [SubscriptionsService],

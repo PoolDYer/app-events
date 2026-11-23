@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { io, Socket } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import type { User } from "../types/models";
 import { apiAuth } from "../api/auth";
 
@@ -65,14 +65,21 @@ export const useAuthStore = defineStore("auth", () => {
         if (socket.value) {
             // Si tu backend exige "Bearer xxx", usa: { token: 'Bearer ' + accessToken.value }
             socket.value.auth = { token: accessToken.value! };
-            socket.value.connect();
+            socket.value.disconnect().connect();
         }
     }
 
     async function logout() {
         try {
             if (refreshToken.value) await apiAuth.logout(refreshToken.value);
-        } catch (_) {}
+        } catch {
+            // Clearing the browser session also works when the API is unavailable.
+        } finally {
+            clearSession();
+        }
+    }
+
+    function clearSession() {
         user.value = null;
         accessToken.value = null;
         refreshToken.value = null;
@@ -83,7 +90,7 @@ export const useAuthStore = defineStore("auth", () => {
     function _connectSocket() {
         if (!accessToken.value || socket.value) return;
 
-        const host = import.meta.env.VITE_WS_HOST || "http://localhost:3000";
+        const host = import.meta.env.VITE_WS_HOST || window.location.origin;
         socket.value = io(host, {
             path: "/notifications/ws",
             transports: ["websocket"],
@@ -134,6 +141,7 @@ export const useAuthStore = defineStore("auth", () => {
         register,
         login,
         refreshTokens,
+        clearSession,
         logout,
     };
 });

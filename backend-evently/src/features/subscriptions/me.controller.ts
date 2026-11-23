@@ -1,6 +1,6 @@
 import { Controller, Get, Req, UseGuards } from "@nestjs/common";
 import { SubscriptionsService } from "./subscriptions.service";
-import { JwtAccessGuard } from "src/core/http/guards/jwt-access.guard";
+import { JwtAccessGuard } from "../../core/http/guards/jwt-access.guard";
 
 @Controller("me")
 @UseGuards(JwtAccessGuard)

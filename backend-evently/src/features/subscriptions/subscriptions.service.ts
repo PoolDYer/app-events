@@ -10,6 +10,7 @@ import { Repository } from "typeorm";
 import { EventSubscription } from "./entities/event-subscription.entity";
 import { EventsService } from "../events/events.service";
 import { UsersService } from "../users/users.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 
 @Injectable()
 export class SubscriptionsService {
@@ -20,6 +21,8 @@ export class SubscriptionsService {
         private readonly events: EventsService,
 
         private readonly users: UsersService,
+        @Inject(forwardRef(() => NotificationsGateway))
+        private readonly notifications: NotificationsGateway,
     ) {}
 
     async subscribe(userId: string, eventId: string) {
@@ -28,12 +31,15 @@ export class SubscriptionsService {
         if (!user) throw new NotFoundException("User not found");
         if (!event) throw new NotFoundException("Event not found");
 
+        let subscription: EventSubscription;
         try {
             const s = this.repo.create({ user, event });
-            return await this.repo.save(s);
+            subscription = await this.repo.save(s);
         } catch {
             throw new BadRequestException("Already subscribed");
         }
+        this.notifications.joinSubscribedUser(userId, eventId);
+        return subscription;
     }
 
     listByUser(userId: string) {

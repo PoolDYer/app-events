@@ -1,4 +1,4 @@
-import axios, { AxiosError } from "axios";
+import axios, { type AxiosError } from "axios";
 import { useAuthStore } from "../stores/auth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -17,45 +17,35 @@ http.interceptors.request.use((config) => {
     const token =
         store?.accessToken ??
         JSON.parse(localStorage.getItem("auth") || "null")?.accessToken;
-    if (token) {
-        config.headers = config.headers || {};
-        (config.headers as any).Authorization = `Bearer ${token}`;
+    if (token && !config.headers.has("Authorization")) {
+        config.headers.set("Authorization", `Bearer ${token}`);
     }
     return config;
 });
 
-let refreshing = false;
-let queue: Array<() => void> = [];
+let refresh: Promise<void> | undefined;
 
 http.interceptors.response.use(
     (r) => r,
     async (error: AxiosError) => {
-        const original = error.config!;
-        if (error.response?.status === 401 && !(original as any)._retry) {
+        const original = error.config as (typeof error.config & { _retry?: boolean });
+        if (original && !original.url?.startsWith("/auth/") && error.response?.status === 401 && !original._retry) {
             const store = tryGetAuthStore();
             if (!store?.refreshToken) {
-                store?.logout();
+                store?.clearSession();
                 return Promise.reject(error);
             }
-            if (refreshing) {
-                await new Promise<void>((resolve) => queue.push(resolve));
-            } else {
-                refreshing = true;
-                try {
-                    await store.refreshTokens();
-                } catch (_) {
-                    await store.logout();
-                    return Promise.reject(error);
-                } finally {
-                    refreshing = false;
-                    queue.forEach((fn) => fn());
-                    queue = [];
+            try {
+                if (original.headers.get("Authorization") === `Bearer ${store.accessToken}`) {
+                    refresh ??= store.refreshTokens().finally(() => { refresh = undefined; });
+                    await refresh;
                 }
+            } catch {
+                store.clearSession();
+                return Promise.reject(error);
             }
-            (original as any)._retry = true;
-            const token = store.accessToken;
-            original.headers = original.headers || {};
-            (original.headers as any).Authorization = `Bearer ${token}`;
+            original._retry = true;
+            original.headers.set("Authorization", `Bearer ${store.accessToken}`);
             return http(original);
         }
 

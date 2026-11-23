@@ -4,8 +4,8 @@ set -eu
 MODE="${APPLICATION_MODE}"
 echo ">> Starting mode=${MODE} NODE_ENV=${NODE_ENV} TZ=${TZ}"
 
-# Esperar a Postgres si está configurado
-if [ -n "${DB_HOST}" ]; then
+# Esperar a MySQL si está configurado
+if [ -n "${DB_HOST:-}" ]; then
   echo ">> Waiting for DB ${DB_HOST}:${DB_PORT} ..."
   # Requiere netcat (lo instalamos en la imagen)
   until nc -z "${DB_HOST}" "${DB_PORT}"; do

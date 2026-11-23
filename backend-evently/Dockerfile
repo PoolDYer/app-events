@@ -42,7 +42,7 @@ COPY package.json ./
 
 # Entrypoint pequeño
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && apk add --no-cache curl
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 USER node
 ENTRYPOINT ["/entrypoint.sh"]

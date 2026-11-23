@@ -1,4 +1,4 @@
-import { Role } from "src/core/http/enums/role.enum";
+import { Role } from "../../../core/http/enums/role.enum";
 import { Event } from "../../../features/events/entities/event.entity";
 import { EventSubscription } from "../../../features/subscriptions/entities/event-subscription.entity";
 import {

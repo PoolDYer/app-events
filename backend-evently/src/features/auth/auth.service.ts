@@ -9,9 +9,9 @@ import * as argon2 from "argon2";
 import { TokenService } from "./tokens/token.service";
 import { RegisterDto } from "./dtos/register.dto";
 import { LoginDto } from "./dtos/login.dto";
-import { UsersService } from "src/features/users/users.service";
-import { RedisService } from "src/core/cache/redis.service";
-import { JwtPayload } from "src/core/http/types/jwt-payload.type";
+import { UsersService } from "../users/users.service";
+import { RedisService } from "../../core/cache/redis.service";
+import { JwtPayload } from "../../core/http/types/jwt-payload.type";
 
 @Injectable()
 export class AuthService {

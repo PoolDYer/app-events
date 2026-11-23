@@ -2,8 +2,8 @@ import * as path from "path";
 import { promises as fs } from "fs";
 import * as argon2 from "argon2";
 import { AppDataSource } from "../typeorm.config";
-import { User } from "src/features/users/entities/user.entity";
-import { Role } from "src/core/http/enums/role.enum";
+import { User } from "../../../features/users/entities/user.entity";
+import { Role } from "../../http/enums/role.enum";
 
 async function resolveUsersFile(): Promise<string> {
     const candidates = [

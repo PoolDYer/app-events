@@ -4,15 +4,15 @@ services:
         container_name: ${REDIS_CONTAINER_NAME}
         restart: unless-stopped
         ports:
-            - "${REDIS_PORT}:6379"
+            - "127.0.0.1:${REDIS_PORT}:6379"
         command: ["redis-server", "--appendonly", "yes"]
         volumes:
-            - internal_volume:/data
+            - redis_data:/data
         networks:
             - internal_network
 
 volumes:
-    internal_volume:
+    redis_data:
         name: ${REDIS_VOLUME}
 
 networks:

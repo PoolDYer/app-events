@@ -12,10 +12,10 @@ import {
 import { EventsService } from "./events.service";
 import { CreateEventDto } from "./dtos/create-event.dto";
 import { UpdateEventDto } from "./dtos/update-event.dto";
-import { RolesGuard } from "src/core/http/guards/roles.guard";
-import { JwtAccessGuard } from "src/core/http/guards/jwt-access.guard";
-import { Roles } from "src/core/http/decorators/roles.decorator";
-import { Role } from "src/core/http/enums/role.enum";
+import { RolesGuard } from "../../core/http/guards/roles.guard";
+import { JwtAccessGuard } from "../../core/http/guards/jwt-access.guard";
+import { Roles } from "../../core/http/decorators/roles.decorator";
+import { Role } from "../../core/http/enums/role.enum";
 
 @Controller("events")
 export class EventsController {
