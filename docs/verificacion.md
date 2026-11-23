@@ -17,6 +17,12 @@
 
 `EventlyBasicTest` cubre la emisión de la caché y su reemplazo al sincronizar, la inscripción con validación de ID y la recuperación del ViewModel después de un fallo de red.
 
+## Resultados de verificación
+
+- El APK de depuración se instaló y ejecutó en un emulador con Android 14. Pasaron las tres pruebas unitarias.
+- Se comprobó el registro, el inicio de sesión, la inscripción, la rotación y la lectura de Room en modo avión. Se inspeccionaron las dos tablas tras cerrar sesión sin red y ambas quedaron vacías.
+- Con un token de acceso de corta duración se comprobó que Android renovó la sesión y cargó Mis suscripciones. La prueba de la API confirmó que dos solicitudes simultáneas para el último cupo solo permiten una inscripción.
+
 ## Capturas del emulador
 
 | Inicio de sesión | Catálogo | Detalle |
