@@ -27,9 +27,6 @@ export class Event {
     @Column({ type: 'datetime' })
     date: Date;
 
-    @Column({ type: 'int', unsigned: true, default: 100 })
-    capacity: number;
-
     @Index()
     @Column({ type: 'enum', enum: EventStatus, default: EventStatus.ACTIVE })
     status: EventStatus;

@@ -77,7 +77,6 @@ export async function seedUser() {
                         description: "Taller práctico de Kotlin y Jetpack Compose con ejemplos de aplicaciones nativas.",
                         location: "Centro Cultural de la UNSCH, Ayacucho",
                         date: new Date(start + 7 * day),
-                        capacity: 40,
                     },
                     {
                         id: "c3830dde-3ff4-4f01-89fa-e4f564cfbb64",
@@ -85,7 +84,6 @@ export async function seedUser() {
                         description: "Demostración de proyectos estudiantiles y conversación con los equipos.",
                         location: "Auditorio universitario, Ayacucho",
                         date: new Date(start + 14 * day),
-                        capacity: 60,
                     },
                 ];
                 await events.createQueryBuilder().insert().values(samples.map(event => ({

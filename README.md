@@ -6,6 +6,8 @@ El módulo Android, el backend del curso y su infraestructura viven en este repo
 
 ## Ejecutar
 
+La API local usa el contrato original de GitHub. El APK actual exige el campo `availableSpots`, que ese contrato omite, por lo que falla la descarga del catálogo desde esta API.
+
 El entorno de desarrollo requiere JDK 21, Android SDK Platform 37 y Docker Desktop con Compose v2. El APK se instala desde Android 10 (API 29).
 
 1. Inicia Docker Desktop. Desde la raíz, ejecuta `& .\infra-evently\start-local.ps1`. Compose inicia MySQL y Redis, aplica las migraciones y arranca la API. El entorno de desarrollo incluye cuentas y eventos de ejemplo.
@@ -44,3 +46,9 @@ La versión de depuración usa `http://10.0.2.2:3001/api/` en el emulador. Para 
 <img src="docs/capturas/04-confirmacion.png" width="220" alt="Detalle de Evently con cupos disponibles e inscripción confirmada">
 
 El cliente usa Kotlin, Jetpack Compose Material 3, Navigation Compose, Hilt, ViewModel, Coroutines, Flow, Room, Retrofit, Moshi, OkHttp y JUnit.
+
+## Documentos del curso
+
+- [Alcance de los proyectos Android](docs/curso/alcance_proyectos_android.md)
+- [Plan de estudio · Desarrollo Móvil Nativo para Android](docs/curso/Plan%20de%20estudio%20-%20Curso%20desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf)
+- [Proyecto final · Desarrollo Móvil Nativo para Android](docs/curso/Proyecto%20Final%20-%20Curso%20Desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf)

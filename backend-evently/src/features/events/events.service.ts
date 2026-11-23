@@ -6,7 +6,6 @@ import { CreateEventDto } from './dtos/create-event.dto';
 import { UpdateEventDto } from './dtos/update-event.dto';
 import { User } from '../users/entities/user.entity';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
-import { EventSubscription } from '../subscriptions/entities/event-subscription.entity';
 
 @Injectable()
 export class EventsService {
@@ -16,38 +15,13 @@ export class EventsService {
         private readonly ws: NotificationsGateway,
     ) {}
 
-    async listPublic() {
+    listPublic() {
         // Solo eventos activos a futuro; orden por fecha asc
-        const events = await this.repo.find({
+        return this.repo.find({
             where: { status: EventStatus.ACTIVE, date: MoreThanOrEqual(new Date()) },
             order: { date: 'ASC' },
             take: 100,
         });
-        return this.withAvailability(events);
-    }
-
-    async detail(id: string) {
-        const event = await this.findById(id);
-        if (!event) throw new NotFoundException('Event not found');
-        return (await this.withAvailability([event]))[0];
-    }
-
-    async withAvailability(events: Event[]) {
-        if (events.length === 0) return [];
-        const counts = await this.repo.manager.getRepository(EventSubscription)
-            .createQueryBuilder('subscription')
-            .select('subscription.eventId', 'eventId')
-            .addSelect('COUNT(*)', 'count')
-            .where('subscription.eventId IN (:...ids)', { ids: events.map(event => event.id) })
-            .groupBy('subscription.eventId')
-            .getRawMany<{ eventId: string; count: string }>();
-        const totals = new Map(counts.map(row => [row.eventId, Number(row.count)]));
-        return events.map(event => ({
-            ...event,
-            availableSpots: event.status === EventStatus.ACTIVE && event.date >= new Date()
-                ? Math.max(0, event.capacity - (totals.get(event.id) ?? 0))
-                : 0,
-        }));
     }
 
     findById(id: string) {
@@ -60,7 +34,6 @@ export class EventsService {
             description: dto.description,
             location: dto.location,
             date: new Date(dto.date),
-            capacity: dto.capacity ?? 100,
             status: EventStatus.ACTIVE,
             createdBy: creator,
         });
@@ -83,7 +56,6 @@ export class EventsService {
             description: dto.description ?? event.description,
             location: dto.location ?? event.location,
             date: dto.date ? new Date(dto.date) : event.date,
-            capacity: dto.capacity ?? event.capacity,
         });
         const saved = await this.repo.save(event);
         this.ws.emitEventUpdated(id);

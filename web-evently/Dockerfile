@@ -18,7 +18,7 @@ FROM nginx:1.27-alpine
 # (comentario) Imagen ligera de Nginx para servir archivos estáticos
 
 # (comentario) Remplazamos la config por una preparada para SPA (history mode)
-COPY ./nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf
 
 # (comentario) Copiamos los artefactos compilados al directorio web de Nginx
 COPY --from=build /app/dist/ /usr/share/nginx/html/

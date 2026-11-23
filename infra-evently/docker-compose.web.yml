@@ -7,8 +7,11 @@ services:
         platform: ${WEB_DOCKER_PLATFORM}
         container_name: ${WEB_CONTAINER_NAME}
         restart: unless-stopped
+        env_file:
+            - .env
         environment:
-            EVENTLY_UPSTREAM: ${HTTP_CONTAINER_NAME}:${HTTP_APP_PORT}
+            VITE_API_BASE_URL: ${WEB_VITE_API_BASE_URL}
+            VITE_WS_HOST: ${WEB_VITE_WS_HOST}
         ports:
             - "127.0.0.1:${WEB_APP_PORT}:80"
         networks:

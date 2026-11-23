@@ -24,7 +24,6 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
             const payload = await this.jwt.verifyAsync(token, { secret: this.config.get<string>('JWT_ACCESS_SECRET') });
             (client as any).user = payload;
 
-            await client.join(`user:${payload.sub}`);
             // Unir al cliente a rooms de sus eventos
             const list = await this.subs.listByUser(payload.sub);
             for (const s of list) client.join(`event:${s.event.id}`);
@@ -34,10 +33,6 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
     }
 
     handleDisconnect(_client: Socket) {}
-
-    joinSubscribedUser(userId: string, eventId: string) {
-        this.server.in(`user:${userId}`).socketsJoin(`event:${eventId}`);
-    }
 
     // Emite actualización a suscritos de un evento
     emitEventUpdated(eventId: string) {

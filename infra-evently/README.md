@@ -116,6 +116,8 @@ HTTP_SWAGGER_VERSION="1.0.0"
 # Web
 WEB_CONTAINER_NAME="web-app-evently"
 WEB_DOCKER_PLATFORM="linux/amd64"
+WEB_VITE_API_BASE_URL="http://http-app-evently:3001/api"
+WEB_VITE_WS_HOST="http://http-app-evently:3001"
 WEB_APP_PORT="3000"
 
 ```

@@ -17,35 +17,45 @@ http.interceptors.request.use((config) => {
     const token =
         store?.accessToken ??
         JSON.parse(localStorage.getItem("auth") || "null")?.accessToken;
-    if (token && !config.headers.has("Authorization")) {
-        config.headers.set("Authorization", `Bearer ${token}`);
+    if (token) {
+        config.headers = config.headers || {};
+        (config.headers as any).Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
-let refresh: Promise<void> | undefined;
+let refreshing = false;
+let queue: Array<() => void> = [];
 
 http.interceptors.response.use(
     (r) => r,
     async (error: AxiosError) => {
-        const original = error.config as (typeof error.config & { _retry?: boolean });
-        if (original && !original.url?.startsWith("/auth/") && error.response?.status === 401 && !original._retry) {
+        const original = error.config!;
+        if (error.response?.status === 401 && !(original as any)._retry) {
             const store = tryGetAuthStore();
             if (!store?.refreshToken) {
-                store?.clearSession();
+                store?.logout();
                 return Promise.reject(error);
             }
-            try {
-                if (original.headers.get("Authorization") === `Bearer ${store.accessToken}`) {
-                    refresh ??= store.refreshTokens().finally(() => { refresh = undefined; });
-                    await refresh;
+            if (refreshing) {
+                await new Promise<void>((resolve) => queue.push(resolve));
+            } else {
+                refreshing = true;
+                try {
+                    await store.refreshTokens();
+                } catch (_) {
+                    await store.logout();
+                    return Promise.reject(error);
+                } finally {
+                    refreshing = false;
+                    queue.forEach((fn) => fn());
+                    queue = [];
                 }
-            } catch {
-                store.clearSession();
-                return Promise.reject(error);
             }
-            original._retry = true;
-            original.headers.set("Authorization", `Bearer ${store.accessToken}`);
+            (original as any)._retry = true;
+            const token = store.accessToken;
+            original.headers = original.headers || {};
+            (original.headers as any).Authorization = `Bearer ${token}`;
             return http(original);
         }
 
