@@ -28,7 +28,7 @@ export class EventsController {
 
     @Get(":id")
     get(@Param("id") id: string) {
-        return this.events.findById(id);
+        return this.events.detail(id);
     }
 
     @Post()

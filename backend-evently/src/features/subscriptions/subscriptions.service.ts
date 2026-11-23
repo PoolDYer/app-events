@@ -1,5 +1,5 @@
 import {
-    BadRequestException,
+    ConflictException,
     Injectable,
     NotFoundException,
     Inject,
@@ -8,8 +8,8 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { EventSubscription } from "./entities/event-subscription.entity";
+import { Event, EventStatus } from "../events/entities/event.entity";
 import { EventsService } from "../events/events.service";
-import { UsersService } from "../users/users.service";
 import { NotificationsGateway } from "../notifications/notifications.gateway";
 
 @Injectable()
@@ -19,30 +19,47 @@ export class SubscriptionsService {
         private readonly repo: Repository<EventSubscription>,
         @Inject(forwardRef(() => EventsService))
         private readonly events: EventsService,
-
-        private readonly users: UsersService,
         @Inject(forwardRef(() => NotificationsGateway))
         private readonly notifications: NotificationsGateway,
     ) {}
 
     async subscribe(userId: string, eventId: string) {
-        const user = await this.users.findById(userId);
-        const event = await this.events.findById(eventId);
-        if (!user) throw new NotFoundException("User not found");
-        if (!event) throw new NotFoundException("Event not found");
+        const id = await this.repo.manager.transaction(async manager => {
+            const event = await manager.getRepository(Event).findOne({
+                where: { id: eventId },
+                lock: { mode: "pessimistic_write" },
+                loadEagerRelations: false,
+            });
+            if (!event) throw new NotFoundException("Event not found");
+            const subscriptions = manager.getRepository(EventSubscription);
+            const existing = await subscriptions.findOne({
+                where: { user: { id: userId }, event: { id: eventId } },
+                loadEagerRelations: false,
+            });
+            if (existing) return existing.id;
+            if (event.status !== EventStatus.ACTIVE || event.date < new Date()) {
+                throw new ConflictException("EVENT_CLOSED");
+            }
+            const count = await subscriptions.countBy({ event: { id: eventId } });
+            if (count >= event.capacity) throw new ConflictException("EVENT_FULL");
 
-        let subscription: EventSubscription;
-        try {
-            const s = this.repo.create({ user, event });
-            subscription = await this.repo.save(s);
-        } catch {
-            throw new BadRequestException("Already subscribed");
-        }
+            const subscription = subscriptions.create({ user: { id: userId }, event });
+            return (await subscriptions.save(subscription)).id;
+        });
         this.notifications.joinSubscribedUser(userId, eventId);
-        return subscription;
+        return { id, event: await this.events.detail(eventId) };
     }
 
-    listByUser(userId: string) {
-        return this.repo.find({ where: { user: { id: userId } } });
+    async listByUser(userId: string) {
+        const subscriptions = await this.repo.find({
+            where: { user: { id: userId } },
+            order: { subscribedAt: "DESC" },
+        });
+        const events = await this.events.withAvailability(subscriptions.map(subscription => subscription.event));
+        const byId = new Map(events.map(event => [event.id, event]));
+        return subscriptions.map(subscription => ({
+            ...subscription,
+            event: byId.get(subscription.event.id)!,
+        }));
     }
 }

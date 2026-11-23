@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import * as argon2 from "argon2";
 import { AppDataSource } from "../typeorm.config";
 import { User } from "../../../features/users/entities/user.entity";
+import { Event, EventStatus } from "../../../features/events/entities/event.entity";
 import { Role } from "../../http/enums/role.enum";
 
 async function resolveUsersFile(): Promise<string> {
@@ -62,6 +63,37 @@ export async function seedUser() {
             });
 
             console.log(`email registrado: ${item.email}`);
+        }
+        if (process.env.NODE_ENV === "development") {
+            const organizer = await repo.findOneBy({ role: Role.ORGANIZER });
+            if (organizer) {
+                const events = runner.manager.getRepository(Event);
+                const start = Date.now();
+                const day = 24 * 60 * 60 * 1000;
+                const samples = [
+                    {
+                        id: "755a3923-b2ef-4a06-9a05-a33034854d72",
+                        title: "Encuentro de desarrollo Android",
+                        description: "Taller práctico de Kotlin y Jetpack Compose con ejemplos de aplicaciones nativas.",
+                        location: "Centro Cultural de la UNSCH, Ayacucho",
+                        date: new Date(start + 7 * day),
+                        capacity: 40,
+                    },
+                    {
+                        id: "c3830dde-3ff4-4f01-89fa-e4f564cfbb64",
+                        title: "Feria de proyectos móviles",
+                        description: "Demostración de proyectos estudiantiles y conversación con los equipos.",
+                        location: "Auditorio universitario, Ayacucho",
+                        date: new Date(start + 14 * day),
+                        capacity: 60,
+                    },
+                ];
+                await events.createQueryBuilder().insert().values(samples.map(event => ({
+                    ...event,
+                    status: EventStatus.ACTIVE,
+                    createdBy: organizer,
+                }))).orIgnore().execute();
+            }
         }
         await runner.commitTransaction();
         console.log("Seed de users completado - OK");
