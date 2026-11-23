@@ -1,98 +1,142 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend Evently · API REST
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API NestJS que usa Evently Mobile para registro, sesión, catálogo e inscripciones. MySQL guarda los datos del negocio y Redis conserva las marcas de revocación de tokens. El contrato de eventos actual omite `availableSpots`, que Android exige al leer un evento. [Guía de Android](../docs/README.md#32-contrato-rest) · [Infraestructura](../infra-evently/README.md)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 1. Stack técnico y arquitectura
 
-## Description
+| Componente | Tecnología | Responsabilidad |
+| --- | --- | --- |
+| Entrada HTTP | NestJS 11, Helmet y Swagger | Rutas, validación de DTO y documentación en `/api/docs`. |
+| Sesión | Passport, JWT y Argon2 | Valida tokens y verifica contraseñas almacenadas como hash. |
+| Persistencia | TypeORM 0.3 y MySQL 8.0 | Entidades, repositorios y migraciones. |
+| Revocación | ioredis 5 y Redis 8.2 | Guarda marcas temporales de tokens revocados. |
+| Compilación | TypeScript 5, Node 22 y pnpm | Genera JavaScript en `dist/`. |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ pnpm install
+```mermaid
+flowchart LR
+    Client["Android o web"]
+    Http["Controlador NestJS"]
+    Guard["Guard de JWT · rutas protegidas"]
+    Services["Servicios · auth, events, subscriptions"]
+    Orm["Repositorios TypeORM"]
+    MySQL[("MySQL")]
+    Redis[("Redis")]
+    Client -- "HTTP /api" --> Http
+    Guard --> Http
+    Http --> Services
+    Services --> Orm --> MySQL
+    Services -- "Revocación" --> Redis
 ```
 
-## Compile and run the project
+El controlador recibe parámetros y DTO. El servicio ejecuta la operación y usa repositorios TypeORM. En rutas protegidas, el guard verifica el Bearer y coloca el payload en `req.user`. La aplicación ejecuta `ValidationPipe` con transformación y rechazo de propiedades ajenas al DTO. [Arranque NestJS](src/main.ts) · [Guard de acceso](src/core/http/guards/jwt-access.guard.ts)
 
-```bash
-# development
-$ pnpm run start
+## 2. Organización del código
 
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```text
+backend-evently/
+├── src/
+│   ├── main.ts                      API, validación global y Swagger
+│   ├── app.module.ts                 Configuración e integración de módulos
+│   ├── core/
+│   │   ├── config/                   HTTP, MySQL, Redis y Swagger
+│   │   ├── cache/                    Cliente Redis
+│   │   ├── http/                     Guards, roles y tipo de JWT
+│   │   ├── cli/                      Procesos de migración y seed
+│   │   └── database/                 TypeORM, migraciones y datos de desarrollo
+│   └── features/
+│       ├── auth/                     Registro, login y renovación
+│       ├── users/                    Usuarios y consultas que usa autenticación
+│       ├── events/                   Catálogo y detalle
+│       └── subscriptions/            Inscripción y lista del usuario
+├── Dockerfile
+└── entrypoint.sh
 ```
 
-## Run tests
+## 3. Persistencia y arranque
 
-```bash
-# unit tests
-$ pnpm run test
+| Entidad | Datos y relaciones |
+| --- | --- |
+| `User` | Identidad, correo, rol y hash de contraseña. |
+| `Event` | Título, descripción, lugar, fecha, estado y referencia al creador. |
+| `EventSubscription` | Usuario, evento y fecha de inscripción. La combinación usuario–evento es única en MySQL. |
 
-# e2e tests
-$ pnpm run test:e2e
+En Docker, el entrypoint espera a MySQL, ejecuta migraciones pendientes y ejecuta los seeds cuando `NODE_ENV=development`. Después arranca NestJS. El seed conserva cuentas existentes y usa identificadores fijos para los eventos de ejemplo. [Entrypoint](entrypoint.sh) · [Seeds](src/core/database/seed/users-seed.ts) · [Entidad de inscripción](src/features/subscriptions/entities/event-subscription.entity.ts)
 
-# test coverage
-$ pnpm run test:cov
+## 4. Contrato REST de Evently Básico
+
+El prefijo habitual es `/api`. La tabla muestra las rutas que usa la app Android.
+
+### 4.1 Sesión
+
+| Método y ruta | Entrada | Resultado |
+| --- | --- | --- |
+| `POST /auth/register` | JSON con `name`, `email`, `password`. La contraseña admite entre 8 y 128 caracteres. | Crea una cuenta y devuelve `user`, `access_token` y `refresh_token`. |
+| `POST /auth/login` | JSON con `email` y `password`. | Devuelve la cuenta y ambos tokens con credenciales válidas. |
+| `POST /auth/refresh-token` | Refresh token en el encabezado Bearer. | Comprueba que el token no esté revocado, registra su revocación y devuelve un nuevo par. |
+| `POST /auth/logout` | Access token en el encabezado Bearer. | Registra en Redis el identificador `jti` recibido. Android envía el refresh token después de borrar su sesión local y ese guard rechaza la petición. |
+
+```mermaid
+sequenceDiagram
+    participant A as Cliente
+    participant G as JwtRefreshGuard
+    participant T as AuthService
+    participant R as Redis
+    A->>G: POST /api/auth/refresh-token con refresh token
+    G->>R: Consulta marca de revocación del jti
+    G->>T: Entrega el JWT validado
+    T->>R: Registra la revocación temporal
+    T-->>A: access_token y refresh_token nuevos
 ```
 
-## Deployment
+[Controlador de sesión](src/features/auth/auth.controller.ts) · [Estrategia de renovación](src/features/auth/strategies/jwt-refresh.strategy.ts) · [Servicio de sesión](src/features/auth/auth.service.ts)
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 4.2 Eventos e inscripciones
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Método y ruta | Autorización | Resultado |
+| --- | --- | --- |
+| `GET /events` | Pública | Hasta 100 eventos activos con fecha vigente, ordenados por fecha. |
+| `GET /events/{id}` | Pública | Busca un evento por ID. |
+| `POST /events/{id}/subscribe` | Access token | Guarda la relación entre el usuario autenticado y el evento. Acepta el ID en la URL. |
+| `GET /me/subscriptions` | Access token | Devuelve las inscripciones del usuario con el evento asociado. |
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+```mermaid
+sequenceDiagram
+    participant C as Cliente REST
+    participant A as SubscriptionsController
+    participant S as SubscriptionsService
+    participant M as MySQL
+    C->>A: POST /api/events/{id}/subscribe con access token
+    A->>S: subscribe con sub del JWT e ID de la ruta
+    S->>M: Busca usuario y evento
+    alt Existe usuario y evento
+        S->>M: Guarda event_subscriptions
+        alt Se guarda la relación
+            S-->>C: Inscripción guardada con el evento
+        else Falla el guardado
+            S-->>C: HTTP 400 Already subscribed
+        end
+    else Falta uno de los registros
+        S-->>C: HTTP 404
+    end
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**Contrato de cupos.** El backend actual devuelve los eventos sin `availableSpots` y la inscripción solo comprueba que existan usuario y evento antes de guardar. Android exige el campo tanto al cargar el catálogo y el detalle como al leer el evento asociado a una inscripción. [Servicio de eventos](src/features/events/events.service.ts) · [Servicio de inscripciones](src/features/subscriptions/subscriptions.service.ts)
 
-## Resources
+## 5. Ejecutar, comprobar y diagnosticar
 
-Check out a few resources that may come in handy when working with NestJS:
+Desde la raíz, inicia el entorno con el script documentado en infraestructura. Para compilar el backend desde esta carpeta con sus dependencias instaladas, ejecuta `pnpm build`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```powershell
+Invoke-RestMethod 'http://localhost:3001/api/events'
+```
 
-## Support
+| Comprobación | Comportamiento actual |
+| --- | --- |
+| Login REST de una cuenta del seed | HTTP 201 con el par de tokens. |
+| Listado y detalle de eventos de ejemplo | HTTP 200 con eventos sin `availableSpots`. |
+| Mis suscripciones con access token | HTTP 200. |
+| Inscripción sin access token | HTTP 401. |
+| Intento de insertar una inscripción duplicada | La restricción única impide el duplicado. El servicio devuelve HTTP 400. |
+| Error de conexión con MySQL durante el arranque | Revisa el estado del contenedor MySQL y los logs de la API. |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+[Swagger local](http://localhost:3001/api/docs) · [Cuentas de desarrollo](src/core/database/seed/data/users.json) · [Comandos y diagnóstico de Docker](../infra-evently/README.md#6-diagnóstico)

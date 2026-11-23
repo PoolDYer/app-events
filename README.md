@@ -1,51 +1,127 @@
-# Evently Mobile · Nivel Básico
+# Evently Mobile · Proyecto final · Nivel Básico
 
-Cliente Android de Evently Básico con registro, inicio y cierre de sesión, navegación y caché local en Room.
+Evently Mobile es un cliente Android para asistentes a eventos. El repositorio contiene el módulo Android, la API REST del curso, un cliente web Vue y el entorno Docker. Android implementa registro, sesión, navegación y caché local. Las pantallas y las consultas de catálogo, detalle e inscripción existen en el cliente.
 
-El módulo Android, el backend del curso y su infraestructura viven en este repositorio Git. El alcance de entrega corresponde a los requisitos comunes y a Evently Básico del [documento oficial](https://github.com/jorgesandovalflores/especializacion-mobile/blob/main/native-android/alcance_proyectos_android.md).
+> **Estado del flujo principal.** La API incluida devuelve eventos sin `availableSpots`. Android exige ese campo y falla al leer el catálogo cuando la respuesta contiene eventos. Con la caché vacía, el flujo se detiene antes de abrir el detalle desde la lista. [Estado de EB-01 a EB-09](docs/requisitos.md)
 
-## Ejecutar
+## Contenido
 
-La API local usa el contrato original de GitHub. El APK actual exige el campo `availableSpots`, que ese contrato omite, por lo que falla la descarga del catálogo desde esta API.
+1. [Componentes](#1-componentes)
+2. [Arquitectura](#2-arquitectura)
+3. [Flujo de consulta e inscripción](#3-flujo-de-consulta-e-inscripción)
+4. [Datos de desarrollo](#4-datos-de-desarrollo)
+5. [Puesta en marcha](#5-puesta-en-marcha)
+6. [Configuración local](#6-configuración-local)
+7. [Estructura de carpetas](#7-estructura-de-carpetas)
+8. [Documentación por módulo](#8-documentación-por-módulo)
 
-El entorno de desarrollo requiere JDK 21, Android SDK Platform 37 y Docker Desktop con Compose v2. El APK se instala desde Android 10 (API 29).
+## 1. Componentes
 
-1. Inicia Docker Desktop. Desde la raíz, ejecuta `& .\infra-evently\start-local.ps1`. Compose inicia MySQL y Redis, aplica las migraciones y arranca la API. El entorno de desarrollo incluye cuentas y eventos de ejemplo.
-2. Comprueba el [catálogo REST](http://localhost:3001/api/events) o abre [Swagger](http://localhost:3001/api/docs).
-3. Abre la raíz en Android Studio y ejecuta el módulo `app` en un emulador. Puedes crear tu cuenta en la pantalla de registro o usar la cuenta `attendee` de [los datos de ejemplo del curso](backend-evently/src/core/database/seed/data/users.json).
+| Carpeta | Responsabilidad | Tecnologías principales |
+| --- | --- | --- |
+| [`app`](app/README.md) | Cliente Android con sesión cifrada y caché de eventos | Kotlin, Compose, Hilt, Retrofit, OkHttp, Room |
+| [`backend-evently`](backend-evently/README.md) | API REST de sesión, eventos e inscripciones | NestJS, JWT, TypeORM, MySQL, Redis |
+| [`web-evently`](web-evently/README.md) | Cliente web del curso | Vue 3, Vite, Pinia, Axios, Nginx |
+| [`infra-evently`](infra-evently/README.md) | Servicios y red Docker del entorno local | Docker Compose, MySQL 8.0 y Redis 8.2 |
+| [`docs`](docs/README.md) | Guía Android, requisitos y material del curso | Markdown, Mermaid y capturas |
+
+## 2. Arquitectura
+
+```mermaid
+flowchart LR
+    Android["Android debug · 10.0.2.2:3001"]
+    Room[("Room · dispositivo")]
+    Browser["Navegador"]
+    Nginx["Web estática · 3000 → 80"]
+    API["API NestJS · 3001"]
+    MySQL[("MySQL · 3306")]
+    Redis[("Redis · 6379 interno")]
+    Android -- "REST /api" --> API
+    Android --> Room
+    Browser -- "HTML, CSS y JS" --> Nginx
+    Browser -- "REST si VITE_API_BASE_URL apunta a la API" --> API
+    API -- "TypeORM" --> MySQL
+    API -- "Revocación de tokens de renovación" --> Redis
+```
+
+Android observa Room para presentar eventos y suscripciones. El servidor persiste la relación entre usuario y evento en MySQL. El navegador recibe los archivos estáticos de Nginx y Axios usa la URL REST configurada al construir la web. [Configuración y comportamiento de la web](web-evently/README.md)
+
+## 3. Flujo de consulta e inscripción
+
+```mermaid
+sequenceDiagram
+    participant A as Android
+    participant R as Room
+    participant B as API REST
+    participant M as MySQL
+    A->>B: POST /api/auth/login
+    B-->>A: access_token y refresh_token
+    A->>A: Guarda los tokens cifrados
+    A->>R: Observa eventos guardados
+    A->>B: GET /api/events
+    B->>M: Consulta eventos activos
+    B-->>A: HTTP 200 con eventos sin availableSpots
+    A->>A: Muestra error de lectura
+    opt Hay un detalle local disponible y el botón está habilitado
+        A->>B: POST /api/events/{id}/subscribe con access token
+        B->>M: Guarda la inscripción si cumple la restricción única
+        B-->>A: Devuelve la inscripción si se guardó
+        A->>A: Requiere availableSpots en el evento devuelto
+    end
+```
+
+Con la caché vacía, el error del catálogo impide abrir el detalle y alcanzar el paso de inscripción. Con un detalle disponible, el botón usa el ID del evento y el access token. La confirmación visual depende de que Android pueda leer la respuesta y guardarla en Room.
+
+[Diagramas de Android](docs/README.md#5-funcionalidades-y-comunicación-entre-capas) · [Contrato REST e inscripción](backend-evently/README.md#42-eventos-e-inscripciones)
+
+## 4. Datos de desarrollo
+
+En Docker, el arranque en modo `development` ejecuta el seed con eventos de ejemplo después de las migraciones. Para verificar el acceso de Android, usa la cuenta `attendee` del archivo de seed. Reiniciar el backend conserva los registros existentes. [Datos de acceso de desarrollo](backend-evently/src/core/database/seed/data/users.json)
+
+## 5. Puesta en marcha
+
+1. Con Docker Desktop iniciado, ejecuta desde la raíz `& .\infra-evently\start-local.ps1`.
+2. Comprueba el catálogo REST en el puerto 3001 y abre Swagger para consultar las rutas.
+3. Abre esta raíz en Android Studio con JDK 21 para Gradle y SDK Platform 37. Ejecuta `app` en un emulador API 29 o superior. En depuración, el emulador apunta a `http://10.0.2.2:3001/api/`.
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
 .\gradlew.bat :app:installDebug
 ```
 
-La versión de depuración usa `http://10.0.2.2:3001/api/` en el emulador. Para un dispositivo físico conectado por USB, ejecuta `adb reverse tcp:3001 tcp:3001` y compila con `-PeventlyApiUrl=http://127.0.0.1:3001/api/`. Para una API remota, configura su URL HTTPS con la misma propiedad. El APK de depuración se genera en `app/build/outputs/apk/debug/app-debug.apk`.
+El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`. Las tres pruebas JVM usan fakes para listado, inscripción y reintento del ViewModel. [Swagger local](http://localhost:3001/api/docs) · [Catálogo REST](http://localhost:3001/api/events) · [Arranque Android y verificación](docs/README.md#6-ejecutar-probar-y-mantener)
 
-## Estado de los requisitos
+## 6. Configuración local
 
-| Código | Estado con la API incluida |
+| Configuración | Uso |
 | --- | --- |
-| EB-01, EB-02 | Registro e inicio con validación local. La pantalla de arranque comprueba la sesión cifrada antes de abrir el catálogo o el login. |
-| EB-03 a EB-06 | Las pantallas y las consultas REST están implementadas en Android. El flujo queda bloqueado porque el backend devuelve eventos sin `availableSpots`. |
-| EB-07, C-01 a C-03 | Indicadores de carga, errores traducidos, reintento y lectura de la caché sin conexión. |
-| EB-08, S-03 | El cierre limpia la sesión y las tablas locales, incluso sin red. |
-| C-04, C-05 | Navigation Compose y ViewModels por entrada de navegación preservan destino, formularios y cargas durante la rotación. |
-| S-01, S-02 | AES-GCM y Android Keystore. OkHttp adjunta el access token y limita a un reintento por petición tras renovar. |
-| S-04, S-05 | Las claves del entorno se generan localmente y los secretos se excluyen de Git. El flujo Básico usa el permiso normal de Internet. |
-| EB-09, Q-01 | Pruebas unitarias con fakes para listado, inscripción y el ViewModel del catálogo. |
-| Q-02 a Q-04 | Documentación y capturas en este repositorio, commits descriptivos y APK de depuración instalable. |
+| `infra-evently/.env` | Variables de Compose y claves locales. El script de PowerShell lo genera desde la plantilla si hace falta. |
+| `local.properties` | Ruta del SDK que configura Android Studio. |
+| Propiedad Gradle `eventlyApiUrl` | URL base de Android al compilar, incluido el prefijo `/api`. |
+| `VITE_API_BASE_URL` | URL REST del navegador. Se resuelve en Vite al ejecutar desarrollo o al compilar. |
 
-## Documentación del proyecto
+[Plantilla de Compose](infra-evently/.env.example) · [Conexión desde un dispositivo físico](docs/README.md#arranque-rápido)
 
-- [Guía técnica de Evently Mobile](docs/README.md)
-- [Requisitos funcionales y reglas de inscripción](docs/requisitos.md)
+## 7. Estructura de carpetas
 
-<img src="docs/capturas/01-login.png" width="220" alt="Pantalla de inicio de sesión de Evently">
+```text
+appevents/
+├── app/                Código, pruebas y recursos Android
+├── backend-evently/    API, migraciones y datos de desarrollo
+├── web-evently/        Cliente Vue y configuración Nginx
+├── infra-evently/     Servicios de Docker Compose y script de inicio
+├── docs/               Guía Android, requisitos, capturas y documentos del curso
+└── gradle/             Wrapper y catálogo de dependencias
+```
 
-El cliente usa Kotlin, Jetpack Compose Material 3, Navigation Compose, Hilt, ViewModel, Coroutines, Flow, Room, Retrofit, Moshi, OkHttp y JUnit.
+## 8. Documentación por módulo
 
-## Documentos del curso
+- [Android](docs/README.md) · Capas, navegación, sesión, Room, pruebas y diagnóstico.
+- [Backend](backend-evently/README.md) · Módulos, autenticación, contrato REST, errores y persistencia.
+- [Web](web-evently/README.md) · Pantallas, sesión, URL REST y publicación estática.
+- [Infraestructura](infra-evently/README.md) · Topología, variables, imágenes, puertos y arranque.
+- [Requisitos del Básico](docs/requisitos.md) · Alcance y estado actual de cada requisito.
 
-- [Alcance de los proyectos Android](docs/curso/alcance_proyectos_android.md)
-- [Plan de estudio · Desarrollo Móvil Nativo para Android](docs/curso/Plan%20de%20estudio%20-%20Curso%20desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf)
-- [Proyecto final · Desarrollo Móvil Nativo para Android](docs/curso/Proyecto%20Final%20-%20Curso%20Desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf)
+## Referencias del curso
+
+[Evently Básico en el alcance oficial](docs/curso/alcance_proyectos_android.md#44-nivel-básico) · [Plan de estudio](docs/curso/Plan%20de%20estudio%20-%20Curso%20desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf) · [Proyecto final](docs/curso/Proyecto%20Final%20-%20Curso%20Desarrollo%20M%C3%B3vil%20Nativo%20para%20Android.pdf)

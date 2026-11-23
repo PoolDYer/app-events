@@ -34,6 +34,31 @@ La aplicación Android se comunica por REST con el backend Evently del curso. El
 
 Compose envía las acciones al ViewModel y observa su `StateFlow` con `collectAsStateWithLifecycle()`. Los ViewModels de pantalla se asocian a su entrada de navegación y el de sesión a la Activity. Las dependencias de presentación y datos apuntan al dominio, que puede probarse en la JVM con un repositorio falso.
 
+```mermaid
+flowchart LR
+    subgraph Presentation["presentation"]
+        UI["Pantallas Compose"]
+        VM["ViewModels"]
+        UI -- "Acciones" --> VM
+        VM -- "StateFlow" --> UI
+    end
+    subgraph Domain["domain"]
+        Cases["Casos de uso"]
+        Contract["Contratos de repositorio"]
+        Cases --> Contract
+    end
+    subgraph Data["data"]
+        Repo["EventlyRepository"]
+        Room[("Room")]
+        Http["Retrofit y OkHttp"]
+        Repo --> Room
+        Repo --> Http
+    end
+    VM --> Cases
+    VM --> Contract
+    Repo -. "Implementa" .-> Contract
+```
+
 ## 2. Organización del código
 
 El módulo `app` agrupa sus archivos por capa. En la raíz del repositorio también están el backend NestJS, la web Vue y la infraestructura Docker del curso.
@@ -65,6 +90,29 @@ app/src/main/java/com/example/app_events/
 ### 3.1 Red y tratamiento de errores
 
 `EventlyModule` configura dos clientes OkHttp. `SessionApi` realiza el registro, el acceso, la renovación y el cierre. `EventsApi` añade el interceptor que usa el access token de la sesión activa. Ante un HTTP 401, `RefreshAuthenticator` sincroniza la renovación, reutiliza un token que otra petición ya haya renovado y permite un solo reintento. El cliente separado de sesión evita que una renovación rechazada vuelva a activar el autenticador.
+
+```mermaid
+sequenceDiagram
+    participant E as EventsApi
+    participant A as RefreshAuthenticator
+    participant S as SessionApi
+    participant K as EncryptedSession
+    participant B as Backend REST
+    E->>B: Petición con access token
+    B-->>E: HTTP 401
+    E->>A: Solicita credenciales para reintentar
+    alt El access token ya cambió en la misma sesión
+        A->>K: Lee el token renovado
+    else La sesión sigue activa y requiere renovación
+        A->>S: Solicita renovar con refresh token
+        S->>B: POST /api/auth/refresh-token
+        B-->>S: Nuevo par si el refresh es válido
+        S-->>A: Devuelve credenciales
+        A->>K: Guarda el par cifrado
+    end
+    A-->>E: Petición con el nuevo Bearer si la renovación fue válida
+    E->>B: Un reintento
+```
 
 | Fallo | Respuesta de la app |
 | --- | --- |
@@ -134,7 +182,26 @@ Room es la fuente de los datos que se muestran en pantalla. El repositorio actua
 | Mis suscripciones | `SubscriptionsViewModel` observa la lista local y la sincroniza con `/me/subscriptions`. | EB-06, EB-07 |
 | Cierre de sesión | La confirmación en `EventlyApp` dispara la limpieza local y devuelve al login. | EB-08 |
 
-### 5.1 Catálogo y detalle
+### 5.1 Navegación, catálogo y detalle
+
+```mermaid
+flowchart TD
+    Start["Arranque · restaura sesión"]
+    Login["Inicio de sesión"]
+    Register["Registro"]
+    Events["Próximos eventos"]
+    Details["Detalle · events/{id}"]
+    Subs["Mis suscripciones"]
+    Start -- "Sin sesión" --> Login
+    Start -- "Sesión restaurada" --> Events
+    Login <--> Register
+    Login -- "Acceso válido" --> Events
+    Register -- "Registro válido" --> Events
+    Events -- "Selecciona un evento guardado" --> Details
+    Events --> Subs
+    Subs -- "Selecciona un evento guardado" --> Details
+    Events -- "Cerrar sesión" --> Login
+```
 
 ```mermaid
 sequenceDiagram
@@ -164,7 +231,33 @@ La ruta `events/{id}` abre el detalle de un evento listado. El repositorio consu
 
 ### 5.2 Inscripción en el cliente
 
-El botón ejecuta `SubscribeToEvent` y el repositorio realiza `POST /api/events/{id}/subscribe`. Para guardar una inscripción, el cliente debe poder leer el evento que devuelve la API. Con el backend incluido el flujo se bloquea desde la descarga inicial de un catálogo con eventos.
+Cuando hay un detalle cargado, el botón ejecuta `SubscribeToEvent` y el repositorio realiza `POST /api/events/{id}/subscribe`. El caso de uso valida el ID y Room recibe el cambio después de la respuesta. Con el backend incluido y una instalación sin caché, el flujo se bloquea al descargar el catálogo.
+
+El diagrama sigue el código de inscripción cuando el detalle está disponible en el dispositivo.
+
+```mermaid
+sequenceDiagram
+    participant UI as Detalle Compose
+    participant VM as EventDetailViewModel
+    participant UC as SubscribeToEvent
+    participant Repo as EventlyRepository
+    participant API as NestJS
+    participant DB as Room
+    UI->>VM: Pulsa Suscribirme
+    VM->>UC: Ejecuta con ID y muestra carga
+    UC->>Repo: subscribe(id)
+    Repo->>API: POST /api/events/{id}/subscribe con access token
+    alt El backend rechaza la petición o Moshi rechaza el JSON
+        Repo-->>VM: Error de dominio
+        VM-->>UI: Muestra el mensaje y Reintentar
+    else La respuesta se puede convertir a SubscriptionDto
+        Repo->>DB: Guarda event y subscription en una transacción
+        DB-->>VM: El flujo observado indica inscrito
+        VM-->>UI: Muestra Suscrito
+    end
+```
+
+[Persistencia del servidor y respuestas del endpoint](../backend-evently/README.md#42-eventos-e-inscripciones)
 
 ## 6. Ejecutar, probar y mantener
 

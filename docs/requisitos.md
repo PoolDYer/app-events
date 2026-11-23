@@ -15,3 +15,16 @@ El actor de la app Android es el asistente. Puede crear una cuenta o usar una ex
 | EB-09 | Ejecutar las pruebas JVM. | Las pruebas con fakes cubren el caso de listado, el caso de inscripción y el ViewModel del catálogo. |
 
 La inscripción requiere conexión y una sesión activa. El cliente habilita el botón cuando el evento está activo y tiene cupos. La API original carece de información de cupos y devuelve HTTP 400 si se repite una inscripción. [Contrato REST](README.md#32-contrato-rest)
+
+## Requisitos comunes
+
+| Códigos | Implementación y alcance de la comprobación |
+| --- | --- |
+| C-01 a C-03 | Estados de carga y error, mensajes en español, reintento y lectura de Room cuando hay datos previos. |
+| C-04 y C-05 | Navigation Compose mantiene la ruta y los ViewModels se asocian a la entrada de navegación. El bloqueo de EB-04 afecta la verificación del recorrido por detalle con la API incluida. |
+| S-01 y S-02 | Tokens cifrados con AES-GCM y clave en Android Keystore. OkHttp añade el access token y permite un reintento al renovar. |
+| S-03 a S-05 | El cierre borra sesión y datos locales. Las claves del entorno se generan localmente. El cliente usa el permiso de Internet. |
+| Q-01 | Tres pruebas JVM con fakes para listado, inscripción y recuperación del ViewModel tras un error. |
+| Q-02 a Q-04 | Guías y commits en el repositorio. El comando de Gradle genera el APK de depuración. |
+
+[Requisitos comunes del curso](curso/alcance_proyectos_android.md#3-requisitos-comunes-todos-los-proyectos) · [Pruebas y ejecución de Android](README.md#6-ejecutar-probar-y-mantener)
